@@ -1,32 +1,31 @@
 pragma solidity ^0.4.11;
    
   // ----------------------------------------------------------------------------------------------
-  // Sample fixed supply token contract
-  // Enjoy. (c) BokkyPooBah 2017. The MIT Licence.
+  // HeartCoin token contract
+  // Gianfranco Oldani
   // ----------------------------------------------------------------------------------------------
    
   // ERC Token Standard #20 Interface
-  // https://github.com/ethereum/EIPs/issues/20
   contract ERC20Interface {
       // Get the total token supply
-      function totalSupply() constant returns (uint256 totalSupply);
+      function totalSupply() constant returns (uint256);
    
       // Get the account balance of another account with address _owner
-      function balanceOf(address _owner) constant returns (uint256 balance);
+      function balanceOf(address _owner) constant returns (uint256);
    
       // Send _value amount of tokens to address _to
-      function transfer(address _to, uint256 _value) returns (bool success);
+      function transfer(address _to, uint256 _value) returns (bool);
    
       // Send _value amount of tokens from address _from to address _to
-      function transferFrom(address _from, address _to, uint256 _value) returns (bool success);
+      function transferFrom(address _from, address _to, uint256 _value) returns (bool);
    
       // Allow _spender to withdraw from your account, multiple times, up to the _value amount.
       // If this function is called again it overwrites the current allowance with _value.
       // this function is required for some DEX functionality
-      function approve(address _spender, uint256 _value) returns (bool success);
+      function approve(address _spender, uint256 _value) returns (bool);
    
       // Returns the amount which _spender is still allowed to withdraw from _owner
-      function allowance(address _owner, address _spender) constant returns (uint256 remaining);
+      function allowance(address _owner, address _spender) constant returns (uint256);
    
       // Triggered when tokens are transferred.
       event Transfer(address indexed _from, address indexed _to, uint256 _value,bool retVal);
@@ -35,88 +34,99 @@ pragma solidity ^0.4.11;
       event Approval(address indexed _owner, address indexed _spender, uint256 _value);
   }
    
+
+// The goal of this contract is to implement an ethereum smart contract token used to reward and labelize 
+// volunteers actions.
+// The owner of the contract is the only actor which is allowed to transfer tokens from one account to another
+// Then the contract owner is the only stakeholder which needs to own an ethereum wallet filled with ethers
+// Any other stakeholder (Volunteer, Association, Merchant partnmers do not need it. They even do not have to know
+// that there is a blockchain smartcontract acting behind.
 contract HeartCoin is ERC20Interface 
  {
-   string public constant symbol 	  = "HCC";
-   string public constant name 		 = "HeartCoin Currency Token";
-   uint8 public constant decimals 	= 2;
-   uint256 _totalSupply 			       = 0;
-   uint256 	minBalanceForAccounts	  = 5; //Ether
-   uint256	minEtherBalanceForBank	= 1; //Ether
-   bool     allowanceActive         = false;
-   // Owner of this contract
-   address public owner;
- 
- 	mapping (address => bool) public frozenAccount;
+    //=====================
+    //Contract data section
+    //=====================
+   
+    // Owner of this contract
+    address public          _contractOwner;
 
-  // Balances for each account
-   mapping(address => uint256) public balances;
+    string public constant  _symbol 	                 = "HCT";
+    string public constant  _name 		                 = "HeartCoin Currency Token";
+    uint8 public constant   _decimals 	               = 2;
+    uint256                 _totalSupply 			       = 0; //BY efault no supply. Will be provided at construction time
+    uint256	                _minEtherBalanceForBank	 = 1; //Ether
+
+    //List of temporarily unusable accounts
+ 	  mapping (address => bool) public _frozenAccount;
+
+    // Balances for each stakeholder account
+    mapping(address => uint256) public _balances;
  
-  // Owner of account approves the transfer of an amount to another account
-   mapping(address => mapping (address => uint256)) allowed;
- 
-  // Functions with this modifier can only be executed by the owner
+   // Functions with this modifier can only be executed by the owner
    modifier onlyOwner() 
    {
-       if (msg.sender != owner) {
-           throw;
+       if (msg.sender != _contractOwner) {
+           revert();
        }
        _;
    }
  
- 	// Other events
- 	event FrozenFunds(address target, bool frozen);
- 	event OwnerBalanceTooLow(address target, uint256 theBalance);
+    //=========================
+    //Contract triggered events
+    //=========================
+ 	  event FrozenFunds(address target, bool frozen);
+    event ContractOwnerEthersTooLow(address target, uint256 theBalance, bool retval);
+ 	  event TokensSupplyTooLow(address from,address target, uint256 theBalance,bool retval);
+    event FromBalanceTooLow(address from, address to,  uint256 theBalance,bool retval);
 
-  // Constructor
+    // Contract Constructor
    function HeartCoin(uint256 totalSupply) {
-       owner 			       = msg.sender;
-       _totalSupply 	   = totalSupply;
-       balances[owner] 	 = _totalSupply;
+       _contractOwner 		        = msg.sender;
+       _totalSupply 	            = totalSupply;
+       _balances[_contractOwner] 	= _totalSupply;
    }
  
-  function totalSupply() constant returns (uint256 totalSupply) {
-       totalSupply = _totalSupply;
+
+  function totalSupply() constant returns (uint256) {
+       return _balances[_contractOwner];
    }
  
   // What is the balance of a particular account?
-   function balanceOf(address _owner) constant returns (uint256 balance) {
-       return balances[_owner];
+   function balanceOf(address accountOwner) constant returns (uint256) {
+       return _balances[accountOwner];
    }
  
-  // Transfer the balance from owner's account to another account
-  //The onlyOwner reference is to be sure that the oneway transfer is only made from the
-  //HeartCoin owner (bank) to another stakeholder
-   function transfer(address _to, uint256 _amount) onlyOwner returns (bool success) 
+  //Transfer the balance from contract owner (bank) to a stakeholder account
+  //The onlyOwner modifyer ensures that the transfer is only triggerable by the contract owner
+   function transfer(address to, uint256 amount) onlyOwner returns (bool) 
    {
-      //Verify that we are not going to low in ether....i.e. the bank is not
-      //spending tto much for stakeholders transfers
-   		if ( owner.balance < minEtherBalanceForBank ) 
+      //Verify that the contract owner is not going to low in ether....i.e. not spending tto much for stakeholders transfers
+   		if ( _contractOwner.balance < _minEtherBalanceForBank ) 
    		{
-   			OwnerBalanceTooLow(owner,owner.balance);
-   			throw;
+   			ContractOwnerEthersTooLow(_contractOwner,_contractOwner.balance,true);
+   			revert();
    		}
 
-    	if (frozenAccount[msg.sender])
+    	if (_frozenAccount[to])
       {
-          FrozenFunds(msg.sender,true);
-          throw; 
+          FrozenFunds(to,true);
+          revert(); 
       }
 
-       if (balances[msg.sender] >= _amount && _amount > 0 ) 
+       if (_balances[_contractOwner] >= amount && amount > 0 ) 
        {
-           balances[msg.sender] -= _amount;
-           balances[_to]        += _amount;
+           _balances[_contractOwner] -= amount;
+           _balances[to]             += amount;
 
-           Transfer(msg.sender, _to, _amount,true);
+           Transfer(_contractOwner, to, amount,true);
            return true;
        } 
 
-       Transfer(msg.sender, _to, _amount,false);
+       TokensSupplyTooLow(_contractOwner, to, amount,false);
        return false;
    }
  
-  // Send _value amount of tokens from address _from to address _to
+  // Send _value amount of tokens from address from to address to
    // The transferFrom method is used for a withdraw workflow, allowing contracts to send
    // tokens on your behalf, for example to "deposit" to a contract address and/or to charge
    // fees in sub-currencies; the command should fail unless the _from account has
@@ -126,54 +136,33 @@ contract HeartCoin is ERC20Interface
    // The onlyOwner reference is to ensure that only the bank will pay fees fro the HeartCoin 
    // transfers. In a later run if there are too much fees, we can see how the bank can be payed
    // by the caller.
-   function transferFrom(
-       address _from,
-       address _to,
-       uint256 _amount
-   ) onlyOwner returns (bool success) 
+   function transferFrom(address from, address to,uint256 amount) onlyOwner returns (bool) 
    {
-   		if (frozenAccount[_from]) throw;
+   		if (_frozenAccount[from]) revert();
 
-      if ( _amount > 0 && balances[_from] >= _amount ) 
+      if ( amount > 0 && _balances[from] >= amount ) 
       {
-          if ( allowanceActive == false )
-          {
-             balances[_from]            -= _amount;
-             balances[_to]              += _amount;         
-             Transfer(_from, _to, _amount,true);
-             return true;
-          }
-          else
-          {
-              if (allowed[_from][msg.sender] >= _amount )  
-              {
-                   balances[_from]            -= _amount;
-                   balances[_to]              += _amount;
-                   allowed[_from][msg.sender] -= _amount;           
-                   Transfer(_from, _to, _amount,true);
-                   return true;
-              } 
-          }
+         _balances[from]            -= amount;
+         _balances[to]              += amount;         
+         Transfer(from, to, amount,true);
+         return true;
       }
 
-      Transfer(_from, _to, _amount,false);
+      FromBalanceTooLow(from, to, amount,false);
       return false;
    }
  
 
-   function mintToken(address target, uint256 mintedAmount) onlyOwner
+   function mintToken(uint256 mintedAmount) onlyOwner
    {
-	    balances[target] 	+= mintedAmount;
-	    _totalSupply 		  += mintedAmount;
-
-	    Transfer(0, owner, mintedAmount,true);
-	    Transfer(owner, target, mintedAmount,true);
+	    _balances[_contractOwner] 	+= mintedAmount;
+	    _totalSupply 		          += mintedAmount;
 	}
 
 
 	function freezeAccount(address target, bool freeze) onlyOwner 
 	{
-	    frozenAccount[target] = freeze;
+	    _frozenAccount[target] = freeze;
 	    FrozenFunds(target, freeze);
 	}
 
@@ -183,39 +172,40 @@ contract HeartCoin is ERC20Interface
 	}
 
 
-	function setMinBalance(uint minimumBalanceInFinney) onlyOwner 
-	{
-     	minBalanceForAccounts = minimumBalanceInFinney * 1 finney;
-	}
-
 /* ================================================= */
   // Allow _spender to withdraw from your account, multiple times, up to the _value amount.
    // If this function is called again it overwrites the current allowance with _value.
-   //For the time being due to the fact that th withdrawer is always the bank when a transfer from to
-   //is needed, this allowance is not used. Tere is the activateAllowance function to activate this
-   //behaviour if needed
-   function approve(address _spender, uint256 _amount) returns (bool success) 
+   //For the time being due to the fact that the withdrawer is always the bank when a transfer from to
+   //is needed, this allowance is not used. 
+   function approve(address _spender, uint256 _amount) returns (bool) 
    {
-      if ( allowanceActive )
-      {
-       allowed[msg.sender][_spender] = _amount;
-       Approval(msg.sender, _spender, _amount);
-      }
        return true;
    }
  
-  function allowance(address _owner, address _spender) constant returns (uint256 remaining) 
+  function allowance(address _owner, address _spender) constant returns (uint256) 
   {
-       if ( allowanceActive )
-        return allowed[_owner][_spender];
-       else
         return 2^256-1;
-   }
+  }
 
-   function activateAllowance(bool _value) onlyOwner
-   {
-      allowanceActive = _value;
-   }
-/* Function to recover the funds on the contract */
-    function kill() onlyOwner { if (msg.sender == owner) suicide(owner); }
+
+  function test() constant returns (string)
+  {
+    return "OK";
+  }
+
+  // Function to inactivate the contrac t usage
+  function kill() onlyOwner { if (msg.sender == _contractOwner) suicide(_contractOwner); }
+
+
+  //Explicite function to send ethers to our contract by explicitely calling this contract function
+  function receiveDonation() payable {     
+       if ( msg.value <= 0 )
+        revert();
+  }
+
+  //Fallback function used by default when anybody send ethers to our contract from their wallet
+  function () payable {
+      if ( msg.value <= 0 )
+        revert();
+  }
 }
