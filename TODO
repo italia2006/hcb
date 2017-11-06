@@ -1,0 +1,12 @@
++ add approve functionality and fix transferFrom
++ add merchant logic
+  + register merchant
+  + register discount per merchant
+  + event: LogMerchantShopping(who, wad, timestamp) (should be part of transfer function)
+
++ tests
+
+
+questions (nice to have):
++ how to find the total amount of spendings per volunteer
++ how to find out popularity per merchant
