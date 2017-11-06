@@ -1,0 +1,29 @@
+{
+  "name": "truffle-environment",
+  "version": "1.0.0",
+  "description": "DevChain Ethereum Development environment",
+  "repository": "https://github.com/DevchainUserGroup/environment",
+  "author": "Geneva DevChain, Robert Zaremba",
+  "license": "MIT",
+  "dependencies": {
+    "ethereumjs-testrpc": "^4.1.3",
+    "solium": "~0.5.5",
+    "standard": "^10.0.3",
+    "truffle": "^4.0.1"
+  },
+  "devDependencies": {},
+  "standard": {
+    "env": [
+      "mocha"
+    ],
+    "globals": [
+      "assert",
+      "artifacts",
+      "contract"
+    ],
+    "parser": "babel-eslint",
+    "plugins": [
+      "flowtype"
+    ]
+  }
+}
