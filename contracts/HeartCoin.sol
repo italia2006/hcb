@@ -1,39 +1,13 @@
-pragma solidity ^0.4.11;
-
-  // ----------------------------------------------------------------------------------------------
+// ----------------------------------------------------------------------------------------------
   // HeartCoin token contract
   // Gianfranco Oldani
+  // Robert Zaremba
+  // DevChain community
   // ----------------------------------------------------------------------------------------------
 
+pragma solidity ^0.4.17;
 
-  // ERC Token Standard #20 Interface
-  contract ERC20Interface {
-      // Get the total token supply
-      function totalSupply() constant returns (uint256);
-
-      // Get the account balance of another account with address _owner
-      function balanceOf(address _owner) constant returns (uint256);
-
-      // Send _value amount of tokens to address _to
-      function transfer(address _to, uint256 _value) returns (bool);
-
-      // Send _value amount of tokens from address _from to address _to
-      function transferFrom(address _from, address _to, uint256 _value) returns (bool);
-
-      // Allow _spender to withdraw from your account, multiple times, up to the _value amount.
-      // If this function is called again it overwrites the current allowance with _value.
-      // this function is required for some DEX functionality
-      function approve(address _spender, uint256 _value) returns (bool);
-
-      // Returns the amount which _spender is still allowed to withdraw from _owner
-      function allowance(address _owner, address _spender) constant returns (uint256);
-
-      // Triggered when tokens are transferred.
-      event Transfer(address indexed _from, address indexed _to, uint256 _value,bool retVal);
-
-      // Triggered whenever approve(address _spender, uint256 _value) is called.
-      event Approval(address indexed _owner, address indexed _spender, uint256 _value);
-  }
+import "./ERC20.sol";
 
 
 // The goal of this contract is to implement an ethereum smart contract token used to reward and labelize
@@ -73,19 +47,19 @@ contract HeartCoin is ERC20Interface {
     event FromBalanceTooLow(address from, address to,  uint256 theBalance,bool retval);
 
     // Contract Constructor
-    function HeartCoin(uint256 totalSupply) {
+    function HeartCoin(uint256 totalSupply) public {
         _contractOwner              = msg.sender;
         _totalSupply                = totalSupply;
         _balances[_contractOwner]   = _totalSupply;
     }
 
 
-    function totalSupply() view returns (uint256) {
+    function totalSupply() public view returns (uint256) {
         return _balances[_contractOwner];
     }
 
     // What is the balance of a particular account?
-    function balanceOf(address accountOwner) view returns (uint256) {
+    function balanceOf(address accountOwner) public view returns (uint256) {
         return _balances[accountOwner];
     }
 
@@ -123,6 +97,7 @@ contract HeartCoin is ERC20Interface {
     function transferFrom(address from, address to,uint256 amount) public onlyOwner returns (bool) {
         require(from != address(0x0));
         require(to != address(0x0));
+
         if ( amount > 0 && _balances[from] >= amount ) {
             _balances[from]            -= amount;
             _balances[to]              += amount;
@@ -142,30 +117,31 @@ contract HeartCoin is ERC20Interface {
 
 
 
-/* ================================================= */
-  // Allow _spender to withdraw from your account, multiple times, up to the _value amount.
-   // If this function is called again it overwrites the current allowance with _value.
-   //For the time being due to the fact that the withdrawer is always the bank when a transfer from to
-   //is needed, this allowance is not used.
-    function approve(address _spender, uint256 _amount) returns (bool) {
+    // Allow _spender to withdraw from your account, multiple times, up to the _value amount.
+    // If this function is called again it overwrites the current allowance with _value.
+    // For the time being due to the fact that the withdrawer is always the bank when a transfer from to
+    // is needed, this allowance is not used.
+    function approve(address _spender, uint256 _amount) public returns (bool) {
         // TODO
         return true;
     }
 
-    function allowance(address _owner, address _spender) constant returns (uint256) {
-        return 2^256-1;
+    function allowance(address _owner, address _spender) public view returns (uint256) {
+        if (_spender == _contractOwner)
+            return _balances[_owner];
+        return 0;
     }
 
     // Function to inactivate the contrac t usage
-    function kill() onlyOwner {
+    function kill() private onlyOwner {
         selfdestruct(_contractOwner);
     }
 
     //Explicite function to send ethers to our contract by explicitely calling this contract function
-    function receiveDonation() payable {
+    function receiveDonation() public payable {
     }
 
     //Fallback function used by default when anybody send ethers to our contract from their wallet
-    function () payable {
+    function () public payable {
     }
 }
